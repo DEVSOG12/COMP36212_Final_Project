@@ -1,0 +1,59 @@
+********************************************************************************
+Initialising Dataset... 
+********************************************************************************
+Loading training set...
+Magic number: 2051
+Set size: 60000
+x_dim: 28
+y_dim: 28
+Training set loaded successfully...
+
+Loading training set labels...
+Magic number: 2049
+Set size: 60000
+Training set labels loaded successfully...
+
+Loading testing set...
+Magic number: 2051
+Set size: 10000
+x_dim: 28
+y_dim: 28
+Testing set loaded successfully...
+
+Loading testing set labels...
+Magic number: 2049
+Set size: 10000
+Testing set labels loaded successfully...
+
+********************************************************************************
+Initialising neural network... 
+********************************************************************************
+PRNG initialised using seed: 1745604209
+Initialising weight matrices
+Initialising gradient and Jacobian datastructures
+Initialising neuron datastructures
+
+********************************************************************************
+Initialising optimiser...
+********************************************************************************
+Optimising with parameters: 
+	epochs = 2 
+	batch_size = 1 
+	num_batches = 120000
+	learning_rate = 0.010000
+
+********************************************************************************
+Setting optimization method...
+********************************************************************************
+Setting optimization method: SGD (basic)
+********************************************************************************
+Performing training optimisation...
+********************************************************************************
+Epoch: 0,  Total iter: 0,  Mean Loss: 0.000000000000,  Test Acc: 0.087100,  LR: 0.010000
+Epoch: 0,  Total iter: 30000,  Mean Loss: 0.282221897786,  Test Acc: 0.938700,  LR: 0.010000
+Epoch: 1,  Total iter: 60000,  Mean Loss: 0.148591858096,  Test Acc: 0.951000,  LR: 0.010000
+Epoch: 1,  Total iter: 90000,  Mean Loss: 0.108032417551,  Test Acc: 0.964700,  LR: 0.010000
+Epoch: 2,  Total iter: 120000,  Mean Loss: 0.089073134234,  Test Acc: 0.965300,  LR: 0.010000
+********************************************************************************
+Program complete... 
+********************************************************************************
