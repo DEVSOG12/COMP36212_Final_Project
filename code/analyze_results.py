@@ -2,12 +2,10 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
 import glob
 
 # Set style
-plt.style.use('seaborn')
-sns.set_palette("husl")
+plt.style.use('default')
 
 # Create results directory if it doesn't exist
 os.makedirs('plots', exist_ok=True)
@@ -241,7 +239,7 @@ def generate_summary_table():
     
     # Plot comparison
     plt.figure(figsize=(10, 6))
-    sns.barplot(data=summary_df, x='Method', y='Best Accuracy (%)')
+    plt.bar(summary_df['Method'], summary_df['Best Accuracy (%)'])
     plt.xticks(rotation=45)
     plt.title('Comparison of Optimization Methods')
     plt.tight_layout()

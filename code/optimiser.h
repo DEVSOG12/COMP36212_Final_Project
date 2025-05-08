@@ -22,5 +22,6 @@ void update_parameters(unsigned int batch_size);
 void update_learning_rate(unsigned int epoch);
 void set_optimisation_method(optimisation_method_t method, double momentum_param, double final_lr);
 void set_adam_parameters(double beta1, double beta2, double epsilon);
+void set_rmsprop_parameters(double decay_rate, double epsilon);
 
 #endif /* OPTMISER_H */

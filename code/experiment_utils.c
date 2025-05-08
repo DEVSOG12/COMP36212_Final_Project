@@ -304,4 +304,21 @@ void run_single_experiment(optimisation_method_t method, double learning_rate,
     
     // Clean up
     free_dataset_data_structures();
+}
+
+void save_results(const char* filename) {
+    // Get the current results from the optimizer
+    result_point_t result = {
+        .epoch = 0,
+        .iteration = 0,
+        .loss = 0.0,
+        .accuracy = evaluate_testing_accuracy(),
+        .learning_rate = learning_rate
+    };
+    
+    // Initialize the file if it doesn't exist
+    init_results_file(filename);
+    
+    // Log the result
+    log_result(filename, result);
 } 
