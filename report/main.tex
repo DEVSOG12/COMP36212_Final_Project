@@ -8,12 +8,18 @@
 \usepackage{hyperref}
 \usepackage{subcaption} 
 \usepackage{float} 
+\usepackage[
+backend=biber,
+style=numeric,
+sorting=none,
+]{biblatex}
+\addbibresource{biblio.bib}
 
-\geometry{a4paper, margin=2cm} % Set page size and margins
+\geometry{a4paper, margin=2cm} 
 
 \title{COMP36212 Assignment EX3: Gradient-Based Optimisation}
-\author{Oreofe Solarin} % Author not specified
-\date{April 2025} % Date not specified
+\author{Oreofe Solarin}
+\date{April 2025} 
 
 \begin{document}
 
@@ -23,17 +29,23 @@
 
 \subsection{Implementation of Batch SGD}
 
+\noindent The modern back-propagation training pipeline descends directly 
+Rumelhart et al.~\cite{rumelhart1986learning}.
+
+
 The stochastic gradient descent algorithm was implemented as required 
 by extending the skeleton optimisation framework in 
 \texttt{optimiser.c}. The implementation follows Equation (8)
-which describes batch SGD:
+which describes batch SGD \cite{bottou2012sgdtricks}. This update rule is an instance of the Robbins-Monro stochastic-approximation scheme, 
+which converges in expectation provided the learning-rate series satisfies 
+\(\sum_t \eta_t=\infty\) and \(\sum_t \eta_t^2<\infty\) \cite{robbins1951stochastic}.
 
 \begin{equation}
 w = w - \frac{\eta}{m} \sum_{i=1}^{m}\nabla L_{i}(x_{i},w)
 \end{equation}
 
 \noindent Where:
-\noindent \begin{itemize}
+\begin{itemize}
   \item $w$ represents the network weights
   \item $\eta$ is the learning rate
   \item $m$ is the batch size
@@ -54,7 +66,10 @@ for (int i = 0; i < N_NEURONS_L3; i++) {
 }
 \end{verbatim}
 
-\noindent This pattern is repeated for each of the four weight 
+\noindent The weigh are drawn from the Glorot uniform distribution, which balances signal
+variance across layers \cite{glorot2010understanding}.
+
+This pattern is repeated for each of the four weight 
 matrices in the network. The learning rate is normalized by 
 the batch size to ensure consistent step sizes regardless 
 of batch size.
@@ -77,12 +92,15 @@ match the numerical ones with an average relative error of less than $10^{-8}$,
 confirming the correctness of the backpropagation implementation. \\
 
 \noindent Numerical differentiation is much slower than analytical calculation because 
-it requires two forward passes for each parameter, 
+it requires two forward passes for each parameter~\cite{goodfellow2016deep}, 
 resulting in $276,200 \times 2 = 552,400$ forward passes to check all parameters. 
 In contrast, analytical backpropagation requires only one forward and one backward 
 pass regardless of parameter count.
 
 \subsection{SGD Training Results}
+
+% \noindent Following the experimental protocol of LeCun et al.,~\cite{lecun1998gradient}, 
+% random initial accuracy is $\approx 10\%$ for the 10-class MNIST task.
 
 \noindent Training was performed using SGD with batch size $m=10$ 
 and learning rate $\eta=0.1$ for 10 epochs. The convergence 
@@ -199,13 +217,18 @@ Key observations include:
 
 \noindent The performance differences between batch sizes 10 and 100 
 are relatively small (less than 0.5\%), suggesting that for this particular problem, the choice of batch 
-size within this range has only a minor impact on final accuracy. However, the learning curves show 
-that larger batch sizes provide smoother optimization paths with less variance in the loss and accuracy 
-values during training. \\
+size within this range has only a minor impact on final accuracy. This observation is in line with 
+the large-batch generalisation gap reported by Keskar et al., who show that very large mini-batches 
+often converge to sharp minima that generalise slightly worse than those found with smaller 
+batches \cite{keskar2017large}. However, the learning curves show that larger batch sizes provide 
+smoother optimization paths with less variance in the loss and accuracy values during training. \\
 
 \noindent Batch Size 1 requires special consideration, as it is highly sensitive to the learning rate 
 parameter. With a properly tuned learning rate, it can achieve competitive performance, but it 
-requires more careful hyperparameter selection to avoid instability.
+requires more careful hyperparameter selection to avoid instability. \\
+
+\noindent These results illustrate the compute accuracy trade-off of large-scale learning 
+analysed by \cite{bottou2008tradeoffs}.
 
 \subsubsection{Learning Rate Analysis}
 Three different learning rates were evaluated: $\eta=0.1$, $\eta=0.01$, and $\eta=0.001$, all with a fixed batch size of $m=10$.
@@ -238,9 +261,13 @@ Three different learning rates were evaluated: $\eta=0.1$, $\eta=0.01$, and $\et
 
 \noindent Key observations include:
 \begin{itemize}
-    \item \textbf{Learning Rate 0.1}: Converges quickly but shows some oscillation in later stages, achieving a final accuracy of 95.98\%.
-    \item \textbf{Learning Rate 0.01}: Converges more steadily but slower than $\eta=0.1$, reaching a final accuracy of 95.80\%.
-    \item \textbf{Learning Rate 0.001}: Shows significantly slower convergence, achieving a final accuracy of only 90.52\% after the same number of iterations, which is over 5 percentage points worse than the other rates.
+    \item \textbf{Learning Rate 0.1}: Converges quickly but shows some oscillation 
+    in later stages, achieving a final accuracy of 95.98\%.
+    \item \textbf{Learning Rate 0.01}: Converges more steadily but slower than $\eta=0.1$, 
+    reaching a final accuracy of 95.80\%.
+    \item \textbf{Learning Rate 0.001}: Shows significantly slower convergence, 
+    achieving a final accuracy of only 90.52\% after the same number of iterations, 
+    which is over 5 percentage points worse than the other rates.
 \end{itemize}
 
 
@@ -253,15 +280,24 @@ neural networks within a constrained computational budget. If using a very low
 learning rate like 0.001, significantly more training iterations would be 
 required to reach competitive performance.
 
+This learning-rate sensitivity is an example of a
+stability-speed trade-off of SGD discussed in depth by 
+Goodfellow et al.\,\cite{goodfellow2016deep}. From a Bayesian view, 
+reducing $\eta$ tightens the posterior sampling variance of 
+SGD \cite{mandt2017stochastic}
+
 \subsection{Learning Rate Decay Implementation}
 
-Learning rate decay was implemented according to Equation (10), where the learning rate decreases linearly from an initial value $\eta_0$ to a final value $\eta_N$ over the course of training:
+Learning rate decay was implemented according to Equation (10), where the learning rate decreases 
+linearly from an initial value $\eta_0$ to a final value $\eta_N$ over the course of training:
 
 \begin{equation}
 \eta_{k} = \eta_{0}(1-\alpha) + \alpha\eta_{N} \quad \text{where} \quad \alpha = \frac{k}{N}
 \end{equation}
 
-The implementation in \texttt{update\_learning\_rate()} function calculates $\alpha$ as the ratio of the current epoch to the total number of epochs and adjusts the learning rate accordingly.
+The implementation in \texttt{update\_learning\_rate()} function calculates $\alpha$ as the 
+ratio of the current epoch to the total number of epochs and adjusts the learning rate 
+accordingly \cite{smith2017cyclical}.
 
 
 \begin{figure}[H]
@@ -297,7 +333,7 @@ improvement over the best fixed learning rate).
 
 \subsection{Momentum Implementation}
 
-Momentum was implemented according to Equation (11), which introduces a velocity term that accumulates past gradients with an exponential decay:
+Momentum was implemented according to Equation (11), which introduces a velocity term that accumulates past gradients with an exponential decay \cite{qian1999momentum, sutskever2013importance}:
 
 \begin{align}
 v &= \alpha v - \frac{\eta}{m}\sum_{i=1}^{m}\nabla L_{i}(x_{i},w) \\
@@ -361,9 +397,10 @@ Combining learning rate decay with momentum was expected to produce the best res
 \noindent Despite showing promising initial progress in the accuracy plot, the 
 combined approach with momentum and learning rate decay ultimately became unstable,
 resulting in a final accuracy of only 9.8\% (random guessing). 
-This unexpected result highlights an important challenge in optimization: combining multiple enhancement techniques does not always yield better performance and can sometimes lead to instability.
+This unexpected result highlights an important challenge in optimization: combining 
+multiple enhancement techniques does not always yield better performance and can sometimes lead to instability. \\
 
-The failure of this combined approach can be attributed to several possible factors:
+\noindent The failure of this combined approach can be attributed to several possible factors:
 
 \begin{enumerate}
     \item \textbf{Compounding effect}: As the learning rate decreases over time due to decay, the momentum term might retain "memory" of larger previous updates, creating a mismatch between the current appropriate step size and the momentum-driven update.
@@ -383,7 +420,7 @@ In this case, the best performing technique was SGD with learning rate decay, wh
 
 \subsection{Adam Optimizer}
 
-After researching adaptive learning rate methods, I selected Adam (Adaptive Moment Estimation) for implementation. Adam combines ideas from both RMSProp and momentum, maintaining exponentially decaying averages of both past gradients (first moment) and squared gradients (second moment):
+After researching adaptive learning rate methods, I selected Adam (Adaptive Moment Estimation) for implementation \cite{kingma2014adam}. Adam combines ideas from both RMSProp and momentum, maintaining exponentially decaying averages of both past gradients (first moment) and squared gradients (second moment):
 
 \begin{align}
 m_t &= \beta_1 m_{t-1} + (1-\beta_1)g_t \\
@@ -393,7 +430,8 @@ v_t &= \beta_2 v_{t-1} + (1-\beta_2)g_t^2 \\
 \theta_t &= \theta_{t-1} - \alpha\frac{\hat{m}_t}{\sqrt{\hat{v}_t} + \epsilon}
 \end{align}
 
-Where:
+\noindent Where:
+
 \begin{itemize}
     \item $m_t, v_t$ are the first and second moment estimates
     \item $\beta_1, \beta_2$ are decay rates for these moments (set to 0.9 and 0.999 respectively)
@@ -403,11 +441,14 @@ Where:
     \item $\epsilon$ is a small constant to prevent division by zero
 \end{itemize}
 
-Adam adapts the learning rate for each parameter individually based on the historical gradients, providing effectively a parameter-specific learning rate. This is particularly beneficial for problems with sparse gradients or where parameters have different scales of importance.
+Adam adapts the learning rate for each parameter individually based on the historical gradients, 
+providing effectively a parameter-specific learning rate. This is particularly beneficial for 
+problems with sparse gradients or where parameters have different scales of importance.
 
 \subsection{Adam Performance Analysis}
 
-Adam was tested with a learning rate of 0.001, which is a commonly recommended value for this optimizer.
+Adam was tested with a learning rate of 0.001, which is a commonly recommended value 
+for this optimizer.
 
 \begin{figure}[H]
     \centering
@@ -432,61 +473,89 @@ Adam was tested with a learning rate of 0.001, which is a commonly recommended v
 
 
 
-
-It achieved a final accuracy of 96.11\%, which is competitive with the enhanced SGD methods.
-
-The key strengths of Adam observed in the experiments were:
+\noindent It achieved a final accuracy of 96.11\%, which is competitive with the enhanced SGD methods. The key strengths of Adam observed in the experiments were:
 \begin{enumerate}
-    \item \textbf{Parameter-specific adaptation}: Adam adapts learning rates individually for each parameter, allowing better handling of parameters with different gradient magnitudes.
-    \item \textbf{Stability}: Adam showed more stable convergence with less hyperparameter tuning required compared to SGD variants.
-    \item \textbf{Efficiency}: Adam achieved good results with a lower learning rate that would have been too slow for basic SGD.
+    \item \textbf{Parameter-specific adaptation}: Adam adapts learning rates individually 
+    for each parameter, allowing better handling of parameters with different gradient magnitudes.
+    \item \textbf{Stability}: Adam showed more stable convergence with less 
+    hyperparameter tuning required compared to SGD variants.
+    \item \textbf{Efficiency}: Adam achieved good results with a lower learning 
+    rate that would have been too slow for basic SGD.
 \end{enumerate}
 
-In this particular problem, SGD with learning rate decay outperformed Adam. This highlights that while adaptive methods like Adam are powerful general-purpose optimizers, problem-specific enhancements to simpler methods can sometimes yield better results.
+In this particular problem, SGD with learning rate decay outperformed Adam. This highlights 
+that while adaptive methods like Adam are powerful general-purpose optimizers, problem-specific 
+enhancements to simpler methods can sometimes yield better results.
 
 \subsection{Optimal Hyperparameters and Comparison}
 
-Comparing all techniques from Parts I-III, the optimal approach for this MNIST classification task was SGD with learning rate decay, with hyperparameters:
+Comparing all techniques from Parts I-III, the optimal approach for this MNIST classification 
+task was SGD with learning rate decay, with hyperparameters:
 \begin{itemize}
     \item Initial learning rate: 0.1
     \item Final learning rate: 0.001
     \item Batch size: 10
 \end{itemize}
 
-This approach achieved the highest accuracy (97.45\%) and showed good convergence properties. Adam performed well (96.11\%) with minimal tuning, making it a good choice when extensive hyperparameter optimization is not feasible.
+This approach achieved the highest accuracy (97.45\%) and showed good convergence properties. 
+Adam performed well (96.11\%) with minimal tuning, making it a good choice when extensive 
+hyperparameter optimization is not feasible. \\
 
-The comparison of all methods shows that:
+\noindent The comparison of all methods shows that:
 \begin{enumerate}
     \item Basic SGD is effective but converges slowly in later stages
-    \item Learning rate decay significantly improves final accuracy by allowing appropriate step sizes throughout training
-    \item Momentum accelerates convergence, especially in areas with consistent gradient directions
-    \item Combining momentum and learning rate decay can lead to instability if not carefully tuned
-    \item Adam offers good performance with less tuning, making it practical for many applications
+    \item Learning rate decay significantly improves final accuracy by allowing 
+    appropriate step sizes throughout training
+    \item Momentum accelerates convergence, especially in areas with 
+    consistent gradient directions
+    \item Combining momentum and learning rate decay can lead to 
+    instability if not carefully tuned
+    \item Adam offers good performance with less tuning, making it 
+    practical for many applications
 \end{enumerate}
 
-These findings align with theoretical expectations about the strengths and weaknesses of each method and demonstrate how different optimization techniques can be applied to achieve superior performance, while highlighting the importance of stability considerations.
+\noindent Recent work shows that decoupling L2 weight decay from the adaptive update popularised 
+as AdamW can further narrow Adam's generalisation gap relative to SGD while retaining 
+its stability and fast convergence \cite{loshchilov2019adamw}
+
+These findings align with theoretical expectations about the strengths and weaknesses of each method \cite{wilson2017marginal, reddi2018convergence} and demonstrate how different optimization techniques can be applied to achieve superior performance, while highlighting the importance of stability considerations.
+
+\section{Experiments Details}
+
+\noindent We conducted the experiment on GitHub Codespaces, a development environment that's 
+hosted in the cloud. The codespace is hosted by GitHub in a Docker container, running 
+on a virtual machine.
+
+\begin{enumerate}
+    \item \textbf{OS:} Debian GNU/Linux
+    \item \textbf{Distro:} Ubuntu
+    \item \textbf{Version:} 20.04.6 LTS (Focal Fossa)
+    \item \textbf{Techincal Specs:} 4 Core, 16GB RAM, and 32GB Storage
+\end{enumerate}
 
 \section{Conclusion}
 
-This report has explored various gradient-based optimization methods for training a neural network to classify MNIST handwritten digits. Starting with basic stochastic gradient descent, we progressively enhanced the algorithm with techniques such as learning rate decay and momentum, which significantly improved both convergence speed and final accuracy. We also implemented and evaluated the Adam optimizer, finding it to be competitive but slightly outperformed by our best SGD variant.
+This report has explored various gradient-based optimization methods for training a neural 
+network to classify MNIST handwritten digits. Starting with basic stochastic gradient descent, 
+we progressively enhanced the algorithm with techniques such as learning rate decay and 
+momentum, which significantly improved both convergence speed and final accuracy. We also 
+implemented and evaluated the Adam optimizer, finding it to be competitive but slightly 
+outperformed by our best SGD variant. \\
 
-The highest accuracy achieved was 97.45\% using SGD with learning rate decay, demonstrating that even a relatively simple neural network architecture can achieve strong performance on the MNIST dataset when trained with appropriate optimization techniques.
+The highest accuracy achieved was 97.45\% using SGD with learning rate decay, demonstrating 
+that even a relatively simple neural network architecture can achieve strong performance on 
+the MNIST dataset when trained with appropriate optimization techniques. \\
 
-The comparative analysis of different methods provides valuable insights into the trade-offs between optimization speed, stability, and final performance, which can guide the selection of appropriate algorithms for similar machine learning tasks. An important lesson from our experiments is that combining multiple enhancement techniques does not always yield better performance and can sometimes lead to instability if the interaction between techniques is not carefully managed.
+The comparative analysis of different methods provides valuable insights 
+into the trade-offs between optimization speed, stability, and final performance, which can 
+guide the selection of appropriate algorithms for similar machine learning tasks. 
+An important lesson from our experiments is that combining multiple enhancement 
+techniques does not always yield better performance and can sometimes lead to instability 
+if the interaction between techniques is not carefully managed.
 
 \pagebreak
 
-\begin{thebibliography}{9}
-
-\bibitem{kingma2014adam}
-Diederik P. Kingma and Jimmy Ba. Adam: A Method for Stochastic Optimization. \textit{arXiv}, 2014. arXiv:1412.6980.
-
-\bibitem{lecun1998gradient}
-Y. Lecun, L. Bottou, Y. Bengio, and P. Haffner. Gradient-based learning applied to document recognition. \textit{Proceedings of the IEEE}, 86(11):2278-2324, 1998.
-
-\bibitem{bottou2008tradeoffs}
-Léon Bottou and Olivier Bousquet. The tradeoffs of large scale learning. In \textit{Advances in Neural Information Processing Systems 20 (NIPS 2007)}, pages 161-168, 2008.
-
-\end{thebibliography}
+\section*{References}
+\printbibliography[heading=none]
 
 \end{document}
