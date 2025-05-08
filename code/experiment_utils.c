@@ -147,38 +147,161 @@ void run_experiment(const char* filename,
     }
 }
 
-void run_experiments() {
-    printf("Running experiments for analysis...\n");
+void run_experiments(void) {
+    // Part I: Basic SGD
+    printf("Running Part I: Basic SGD experiments...\n");
+    run_sgd_experiments();
     
-    // Part I - Basic SGD with different configurations
-    printf("Part I: Running SGD experiments\n");
-    run_experiment("results_sgd_0.1_10.csv", 0.1, 10, 2, SGD, 0.0, 0.0, 0.0, 0.0, 0.0);
+    // Part II: Improving convergence
+    printf("\nRunning Part II: Improving convergence experiments...\n");
+    run_momentum_experiments();
+    run_lr_decay_experiments();
+    run_combined_experiments();
     
-    // Part II - Exploring batch size and learning rate
-    printf("Part II-A: Exploring batch size and learning rate\n");
-    // Batch size variations
-    run_experiment("results_sgd_0.1_1.csv", 0.1, 1, 2, SGD, 0.0, 0.0, 0.0, 0.0, 0.0);
-    run_experiment("results_sgd_0.1_100.csv", 0.1, 100, 2, SGD, 0.0, 0.0, 0.0, 0.0, 0.0);
+    // Part III: Adaptive learning
+    printf("\nRunning Part III: Adaptive learning experiments...\n");
+    run_adam_experiments();
+    run_rmsprop_experiments();
+}
+
+void run_sgd_experiments(void) {
+    // Learning rates to try
+    double learning_rates[] = {0.1, 0.01, 0.001};
+    // Batch sizes to try
+    int batch_sizes[] = {1, 10, 100};
     
-    // Learning rate variations
-    run_experiment("results_sgd_0.01_10.csv", 0.01, 10, 2, SGD, 0.0, 0.0, 0.0, 0.0, 0.0);
-    run_experiment("results_sgd_0.001_10.csv", 0.001, 10, 2, SGD, 0.0, 0.0, 0.0, 0.0, 0.0);
+    for (int i = 0; i < sizeof(learning_rates)/sizeof(double); i++) {
+        for (int j = 0; j < sizeof(batch_sizes)/sizeof(int); j++) {
+            char filename[100];
+            snprintf(filename, sizeof(filename), "results_sgd_%.3f_%d.csv", 
+                    learning_rates[i], batch_sizes[j]);
+            
+            run_single_experiment(SGD, learning_rates[i], batch_sizes[j], 2, 0.0, 0.0, filename);
+        }
+    }
+}
+
+void run_momentum_experiments(void) {
+    // Momentum values to try
+    double momentums[] = {0.5, 0.7, 0.9, 0.95, 0.99};
+    double learning_rate = 0.1;
+    int batch_size = 10;
     
-    // Part II - Learning rate decay
-    printf("Part II-B: Learning rate decay\n");
-    run_experiment("results_sgd_lr_decay_0.1_0.001.csv", 0.1, 10, 2, SGD_LR_DECAY, 0.0, 0.001, 0.0, 0.0, 0.0);
+    for (int i = 0; i < sizeof(momentums)/sizeof(double); i++) {
+        char filename[100];
+        snprintf(filename, sizeof(filename), "results_sgd_momentum_%.2f.csv", momentums[i]);
+        
+        run_single_experiment(SGD_MOMENTUM, learning_rate, batch_size, 5, momentums[i], 0.0, filename);
+    }
+}
+
+void run_lr_decay_experiments(void) {
+    // Learning rate decay configurations
+    struct lr_decay_config {
+        double initial_lr;
+        double final_lr;
+        int epochs;
+    } configs[] = {
+        {0.1, 0.001, 5},  // Linear decay
+        {0.1, 0.0001, 5}, // Steeper decay
+        {0.01, 0.001, 5}  // Lower initial rate
+    };
     
-    // Part II - Momentum
-    printf("Part II-C: Momentum\n");
-    run_experiment("results_sgd_momentum_0.9.csv", 0.01, 10, 2, SGD_MOMENTUM, 0.9, 0.0, 0.0, 0.0, 0.0);
+    int batch_size = 10;
     
-    // Part II - Combined approaches
-    printf("Part II-D: Combined approaches\n");
-    run_experiment("results_sgd_momentum_lr_decay.csv", 0.1, 10, 2, SGD_MOMENTUM_LR_DECAY, 0.9, 0.001, 0.0, 0.0, 0.0);
+    for (int i = 0; i < sizeof(configs)/sizeof(struct lr_decay_config); i++) {
+        char filename[100];
+        snprintf(filename, sizeof(filename), "results_sgd_lr_decay_%.3f_%.3f.csv", 
+                configs[i].initial_lr, configs[i].final_lr);
+        
+        run_single_experiment(SGD_LR_DECAY, configs[i].initial_lr, batch_size, 
+                            configs[i].epochs, 0.0, configs[i].final_lr, filename);
+    }
+}
+
+void run_combined_experiments(void) {
+    // Combined momentum and learning rate decay
+    double momentums[] = {0.5, 0.7, 0.9};
+    double initial_lr = 0.1;
+    double final_lr = 0.001;
+    int batch_size = 10;
+    int epochs = 5;
     
-    // Part III - Adam
-    printf("Part III: Adam optimizer\n");
-    run_experiment("results_adam.csv", 0.001, 10, 2, ADAM, 0.0, 0.0, 0.9, 0.999, 1e-8);
+    for (int i = 0; i < sizeof(momentums)/sizeof(double); i++) {
+        char filename[100];
+        snprintf(filename, sizeof(filename), "results_sgd_momentum_lr_decay_%.2f.csv", momentums[i]);
+        
+        run_single_experiment(SGD_MOMENTUM_LR_DECAY, initial_lr, batch_size, 
+                            epochs, momentums[i], final_lr, filename);
+    }
+}
+
+void run_adam_experiments(void) {
+    // Adam hyperparameter grid
+    double beta1s[] = {0.8, 0.9, 0.95, 0.99};
+    double beta2s[] = {0.999, 0.9999};
+    double epsilons[] = {1e-8, 1e-7, 1e-6};
+    double learning_rates[] = {0.001, 0.0005, 0.0001};
+    int batch_size = 10;
+    int epochs = 5;
     
-    printf("All experiments completed.\n");
+    for (int i = 0; i < sizeof(beta1s)/sizeof(double); i++) {
+        for (int j = 0; j < sizeof(beta2s)/sizeof(double); j++) {
+            for (int k = 0; k < sizeof(epsilons)/sizeof(double); k++) {
+                for (int l = 0; l < sizeof(learning_rates)/sizeof(double); l++) {
+                    char filename[100];
+                    snprintf(filename, sizeof(filename), 
+                            "results_adam_b1%.2f_b2%.4f_eps%.0e_lr%.4f.csv",
+                            beta1s[i], beta2s[j], epsilons[k], learning_rates[l]);
+                    
+                    run_single_experiment(ADAM, learning_rates[l], batch_size, epochs, 0.0, 0.0, filename);
+                    set_adam_parameters(beta1s[i], beta2s[j], epsilons[k]);
+                }
+            }
+        }
+    }
+}
+
+void run_rmsprop_experiments(void) {
+    // RMSProp hyperparameter grid
+    double rhos[] = {0.8, 0.9, 0.95, 0.99};
+    double epsilons[] = {1e-8, 1e-7, 1e-6};
+    double learning_rates[] = {0.001, 0.0005, 0.0001};
+    int batch_size = 10;
+    int epochs = 5;
+    
+    for (int i = 0; i < sizeof(rhos)/sizeof(double); i++) {
+        for (int j = 0; j < sizeof(epsilons)/sizeof(double); j++) {
+            for (int k = 0; k < sizeof(learning_rates)/sizeof(double); k++) {
+                char filename[100];
+                snprintf(filename, sizeof(filename), 
+                        "results_rmsprop_rho%.2f_eps%.0e_lr%.4f.csv",
+                        rhos[i], epsilons[j], learning_rates[k]);
+                
+                run_single_experiment(RMSPROP, learning_rates[k], batch_size, epochs, 0.0, 0.0, filename);
+                set_rmsprop_parameters(rhos[i], epsilons[j]);
+            }
+        }
+    }
+}
+
+void run_single_experiment(optimisation_method_t method, double learning_rate, 
+                         int batch_size, int epochs, double momentum, 
+                         double final_lr, const char* output_file) {
+    printf("Running experiment: method=%d, lr=%.4f, batch=%d, epochs=%d, momentum=%.2f, final_lr=%.4f\n",
+           method, learning_rate, batch_size, epochs, momentum, final_lr);
+    
+    // Initialize network and dataset
+    initialise_nn();
+    initialise_optimiser(learning_rate, batch_size, epochs);
+    set_optimisation_method(method, momentum, final_lr);
+    
+    // Run optimization
+    run_optimisation();
+    
+    // Save results
+    save_results(output_file);
+    
+    // Clean up
+    free_dataset_data_structures();
 } 

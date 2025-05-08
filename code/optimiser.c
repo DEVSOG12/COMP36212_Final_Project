@@ -2,6 +2,7 @@
 #include "mnist_helper.h"
 #include "neural_network.h"
 #include "math.h"
+#include <time.h>
 
 // Function declarations
 void update_parameters(unsigned int batch_size);
@@ -28,9 +29,29 @@ double beta2 = 0.999;           // Exponential decay rate for second moment esti
 double epsilon = 1e-8;          // Small constant to prevent division by zero
 unsigned int t = 0;             // Time step counter for Adam
 
+// RMSProp parameters
+double rho = 0.9;              // Decay rate for moving average
+double rmsprop_epsilon = 1e-8; // Small constant to prevent division by zero
+
+// Timing variables
+struct timespec start_time, end_time;
+double total_training_time = 0.0;
+double epoch_times[100]; // Store times for each epoch
+unsigned int epoch_time_idx = 0;
+
 void print_training_stats(unsigned int epoch_counter, unsigned int total_iter, double mean_loss, double test_accuracy){
-    printf("Epoch: %u,  Total iter: %u,  Mean Loss: %0.12f,  Test Acc: %f,  LR: %f\n", 
-           epoch_counter, total_iter, mean_loss, test_accuracy, learning_rate);
+    // Calculate elapsed time for this epoch
+    clock_gettime(CLOCK_MONOTONIC, &end_time);
+    double epoch_time = (end_time.tv_sec - start_time.tv_sec) + 
+                       (end_time.tv_nsec - start_time.tv_nsec) / 1e9;
+    epoch_times[epoch_time_idx++] = epoch_time;
+    total_training_time += epoch_time;
+    
+    printf("Epoch: %u,  Total iter: %u,  Mean Loss: %0.12f,  Test Acc: %f,  LR: %f,  Time: %.2fs\n", 
+           epoch_counter, total_iter, mean_loss, test_accuracy, learning_rate, epoch_time);
+    
+    // Reset timer for next epoch
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
 }
 
 void initialise_optimiser(double cmd_line_learning_rate, int cmd_line_batch_size, int cmd_line_total_epochs){
@@ -81,6 +102,14 @@ void set_adam_parameters(double b1, double b2, double eps) {
            beta1, beta2, epsilon);
 }
 
+void set_rmsprop_parameters(double decay_rate, double eps) {
+    rho = decay_rate;
+    rmsprop_epsilon = eps;
+    
+    printf("RMSProp parameters set: rho=%.4f, epsilon=%.8f\n", 
+           rho, rmsprop_epsilon);
+}
+
 // Update learning rate based on current epoch (linear decay)
 void update_learning_rate(unsigned int epoch) {
     if (opt_method == SGD_LR_DECAY || opt_method == SGD_MOMENTUM_LR_DECAY) {
@@ -96,6 +125,9 @@ void run_optimisation(void){
     unsigned int epoch_counter = 0;
     double test_accuracy = 0.0;  //evaluate_testing_accuracy();
     double mean_loss = 0.0;
+    
+    // Start timing
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
     
     // Run optimiser - update parameters after each minibatch
     for (int i=0; i < num_batches; i++){
@@ -135,9 +167,14 @@ void run_optimisation(void){
         update_parameters(batch_size);
     }
     
-    // Print final performance
+    // Print final performance and timing summary
     test_accuracy = evaluate_testing_accuracy();
     print_training_stats(epoch_counter, total_iter, (mean_loss/((double) log_freq)), test_accuracy);
+    
+    printf("\nTraining Summary:\n");
+    printf("Total training time: %.2fs\n", total_training_time);
+    printf("Average epoch time: %.2fs\n", total_training_time / epoch_counter);
+    printf("Time per batch: %.2fms\n", (total_training_time * 1000) / num_batches);
 }
 
 double evaluate_objective_function(unsigned int sample){
@@ -329,6 +366,43 @@ void update_parameters(unsigned int batch_size){
                     double v_hat = w_LI_L1[i][j].v_adam / bc2;
                     
                     w_LI_L1[i][j].w -= lr * m_hat / (sqrt(v_hat) + epsilon);
+                    w_LI_L1[i][j].dw = 0.0;
+                }
+            }
+            break;
+        
+        case RMSPROP:
+            // RMSProp update
+            for (int i = 0; i < N_NEURONS_L3; i++) {
+                for (int j = 0; j < N_NEURONS_LO; j++) {
+                    // Update moving average of squared gradients
+                    w_L3_LO[i][j].v = rho * w_L3_LO[i][j].v + (1 - rho) * w_L3_LO[i][j].dw * w_L3_LO[i][j].dw;
+                    // Update weights
+                    w_L3_LO[i][j].w -= lr * w_L3_LO[i][j].dw / (sqrt(w_L3_LO[i][j].v) + rmsprop_epsilon);
+                    w_L3_LO[i][j].dw = 0.0;
+                }
+            }
+            
+            for (int i = 0; i < N_NEURONS_L2; i++) {
+                for (int j = 0; j < N_NEURONS_L3; j++) {
+                    w_L2_L3[i][j].v = rho * w_L2_L3[i][j].v + (1 - rho) * w_L2_L3[i][j].dw * w_L2_L3[i][j].dw;
+                    w_L2_L3[i][j].w -= lr * w_L2_L3[i][j].dw / (sqrt(w_L2_L3[i][j].v) + rmsprop_epsilon);
+                    w_L2_L3[i][j].dw = 0.0;
+                }
+            }
+            
+            for (int i = 0; i < N_NEURONS_L1; i++) {
+                for (int j = 0; j < N_NEURONS_L2; j++) {
+                    w_L1_L2[i][j].v = rho * w_L1_L2[i][j].v + (1 - rho) * w_L1_L2[i][j].dw * w_L1_L2[i][j].dw;
+                    w_L1_L2[i][j].w -= lr * w_L1_L2[i][j].dw / (sqrt(w_L1_L2[i][j].v) + rmsprop_epsilon);
+                    w_L1_L2[i][j].dw = 0.0;
+                }
+            }
+            
+            for (int i = 0; i < N_NEURONS_LI; i++) {
+                for (int j = 0; j < N_NEURONS_L1; j++) {
+                    w_LI_L1[i][j].v = rho * w_LI_L1[i][j].v + (1 - rho) * w_LI_L1[i][j].dw * w_LI_L1[i][j].dw;
+                    w_LI_L1[i][j].w -= lr * w_LI_L1[i][j].dw / (sqrt(w_LI_L1[i][j].v) + rmsprop_epsilon);
                     w_LI_L1[i][j].dw = 0.0;
                 }
             }

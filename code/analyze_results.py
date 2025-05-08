@@ -2,207 +2,271 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
+import glob
+
+# Set style
+plt.style.use('seaborn')
+sns.set_palette("husl")
 
 # Create results directory if it doesn't exist
 os.makedirs('plots', exist_ok=True)
 
-# Function to load result data
-def load_results(filename):
-    return pd.read_csv(filename)
+def load_results(pattern):
+    """Load all CSV files matching the pattern into a list of dataframes."""
+    files = glob.glob(pattern)
+    dfs = []
+    for f in files:
+        df = pd.read_csv(f)
+        # Extract parameters from filename
+        params = os.path.basename(f).replace('.csv', '').split('_')
+        df['params'] = '_'.join(params[2:])  # Skip 'results' and method name
+        dfs.append(df)
+    return pd.concat(dfs, ignore_index=True)
 
-# Plot accuracy vs. iterations for a single configuration
-def plot_accuracy_single(data, title, output_file):
+def plot_learning_curves(dfs, title, ylabel, filename, log_scale=False):
+    """Plot learning curves with proper formatting."""
     plt.figure(figsize=(10, 6))
-    plt.plot(data['iteration'], data['accuracy'], marker='o', linestyle='-', markersize=4)
+    
+    for df in dfs:
+        label = df['params'].iloc[0]
+        plt.plot(df['iteration'] / 1000, df['value'], label=label)
+    
+    plt.xlabel('Iterations (×10³)')
+    plt.ylabel(ylabel)
     plt.title(title)
-    plt.xlabel('Iterations')
-    plt.ylabel('Accuracy')
-    plt.grid(True)
-    plt.savefig(output_file)
+    if log_scale:
+        plt.yscale('log')
+    plt.grid(True, alpha=0.3)
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.close()
 
-# Plot loss vs. iterations for a single configuration
-def plot_loss_single(data, title, output_file):
+def plot_hyperparameter_sweep(df, param_name, title, filename):
+    """Plot hyperparameter sweep results."""
     plt.figure(figsize=(10, 6))
-    plt.plot(data['iteration'], data['loss'], marker='o', linestyle='-', markersize=4)
+    
+    # Group by parameter value and calculate mean/std
+    grouped = df.groupby(param_name)['value'].agg(['mean', 'std']).reset_index()
+    
+    plt.errorbar(grouped[param_name], grouped['mean'], yerr=grouped['std'], 
+                fmt='o-', capsize=5)
+    
+    plt.xlabel(f'{param_name} value')
+    plt.ylabel('Final accuracy (%)')
     plt.title(title)
-    plt.xlabel('Iterations')
-    plt.ylabel('Loss')
-    plt.grid(True)
-    plt.savefig(output_file)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.close()
 
-# Plot accuracy for multiple configurations
-def plot_accuracy_comparison(data_dict, title, output_file):
-    plt.figure(figsize=(12, 8))
-    for label, data in data_dict.items():
-        plt.plot(data['iteration'], data['accuracy'], marker='o', linestyle='-', markersize=3, label=label)
-    plt.title(title)
-    plt.xlabel('Iterations')
-    plt.ylabel('Accuracy')
-    plt.grid(True)
-    plt.legend()
-    plt.savefig(output_file)
+def analyze_sgd():
+    """Analyze basic SGD results."""
+    # Load results
+    sgd_dfs = load_results('results_sgd_*.csv')
+    
+    # Plot learning curves
+    plot_learning_curves(
+        [sgd_dfs[sgd_dfs['params'] == p] for p in sgd_dfs['params'].unique()],
+        'SGD Learning Curves',
+        'Loss',
+        'part1_sgd_loss.png',
+        log_scale=True
+    )
+    
+    # Plot accuracy curves
+    plot_learning_curves(
+        [sgd_dfs[sgd_dfs['params'] == p] for p in sgd_dfs['params'].unique()],
+        'SGD Accuracy Curves',
+        'Accuracy (%)',
+        'part1_sgd_accuracy.png'
+    )
+
+def analyze_momentum():
+    """Analyze momentum results."""
+    # Load results
+    momentum_dfs = load_results('results_sgd_momentum_*.csv')
+    
+    # Plot learning curves
+    plot_learning_curves(
+        [momentum_dfs[momentum_dfs['params'] == p] for p in momentum_dfs['params'].unique()],
+        'SGD with Momentum Learning Curves',
+        'Loss',
+        'part2c_momentum_loss.png',
+        log_scale=True
+    )
+    
+    # Plot accuracy curves
+    plot_learning_curves(
+        [momentum_dfs[momentum_dfs['params'] == p] for p in momentum_dfs['params'].unique()],
+        'SGD with Momentum Accuracy Curves',
+        'Accuracy (%)',
+        'part2c_momentum_accuracy.png'
+    )
+
+def analyze_lr_decay():
+    """Analyze learning rate decay results."""
+    # Load results
+    lr_decay_dfs = load_results('results_sgd_lr_decay_*.csv')
+    
+    # Plot learning curves
+    plot_learning_curves(
+        [lr_decay_dfs[lr_decay_dfs['params'] == p] for p in lr_decay_dfs['params'].unique()],
+        'Learning Rate Decay Curves',
+        'Loss',
+        'part2b_lr_decay_loss.png',
+        log_scale=True
+    )
+    
+    # Plot accuracy curves
+    plot_learning_curves(
+        [lr_decay_dfs[lr_decay_dfs['params'] == p] for p in lr_decay_dfs['params'].unique()],
+        'Learning Rate Decay Accuracy Curves',
+        'Accuracy (%)',
+        'part2b_lr_decay_accuracy.png'
+    )
+
+def analyze_combined():
+    """Analyze combined momentum and learning rate decay results."""
+    # Load results
+    combined_dfs = load_results('results_sgd_momentum_lr_decay_*.csv')
+    
+    # Plot learning curves
+    plot_learning_curves(
+        [combined_dfs[combined_dfs['params'] == p] for p in combined_dfs['params'].unique()],
+        'Combined Momentum and Learning Rate Decay',
+        'Loss',
+        'part2d_combined_loss.png',
+        log_scale=True
+    )
+    
+    # Plot accuracy curves
+    plot_learning_curves(
+        [combined_dfs[combined_dfs['params'] == p] for p in combined_dfs['params'].unique()],
+        'Combined Momentum and Learning Rate Decay',
+        'Accuracy (%)',
+        'part2d_combined_accuracy.png'
+    )
+
+def analyze_adam():
+    """Analyze Adam results."""
+    # Load results
+    adam_dfs = load_results('results_adam_*.csv')
+    
+    # Plot learning curves
+    plot_learning_curves(
+        [adam_dfs[adam_dfs['params'] == p] for p in adam_dfs['params'].unique()],
+        'Adam Learning Curves',
+        'Loss',
+        'part3_adam_loss.png',
+        log_scale=True
+    )
+    
+    # Plot accuracy curves
+    plot_learning_curves(
+        [adam_dfs[adam_dfs['params'] == p] for p in adam_dfs['params'].unique()],
+        'Adam Accuracy Curves',
+        'Accuracy (%)',
+        'part3_adam_accuracy.png'
+    )
+    
+    # Plot hyperparameter sweeps
+    for param in ['beta1', 'beta2', 'epsilon', 'lr']:
+        param_dfs = adam_dfs[adam_dfs['params'].str.contains(param)]
+        plot_hyperparameter_sweep(
+            param_dfs,
+            param,
+            f'Adam {param.upper()} Sweep',
+            f'part3_adam_{param}_sweep.png'
+        )
+
+def analyze_rmsprop():
+    """Analyze RMSProp results."""
+    # Load results
+    rmsprop_dfs = load_results('results_rmsprop_*.csv')
+    
+    # Plot learning curves
+    plot_learning_curves(
+        [rmsprop_dfs[rmsprop_dfs['params'] == p] for p in rmsprop_dfs['params'].unique()],
+        'RMSProp Learning Curves',
+        'Loss',
+        'part3_rmsprop_loss.png',
+        log_scale=True
+    )
+    
+    # Plot accuracy curves
+    plot_learning_curves(
+        [rmsprop_dfs[rmsprop_dfs['params'] == p] for p in rmsprop_dfs['params'].unique()],
+        'RMSProp Accuracy Curves',
+        'Accuracy (%)',
+        'part3_rmsprop_accuracy.png'
+    )
+    
+    # Plot hyperparameter sweeps
+    for param in ['rho', 'epsilon', 'lr']:
+        param_dfs = rmsprop_dfs[rmsprop_dfs['params'].str.contains(param)]
+        plot_hyperparameter_sweep(
+            param_dfs,
+            param,
+            f'RMSProp {param.upper()} Sweep',
+            f'part3_rmsprop_{param}_sweep.png'
+        )
+
+def generate_summary_table():
+    """Generate a summary table of best results for each method."""
+    methods = {
+        'SGD': 'results_sgd_*.csv',
+        'SGD+Momentum': 'results_sgd_momentum_*.csv',
+        'SGD+LR Decay': 'results_sgd_lr_decay_*.csv',
+        'SGD+Momentum+LR Decay': 'results_sgd_momentum_lr_decay_*.csv',
+        'Adam': 'results_adam_*.csv',
+        'RMSProp': 'results_rmsprop_*.csv'
+    }
+    
+    summary = []
+    for method, pattern in methods.items():
+        dfs = load_results(pattern)
+        best_params = dfs.groupby('params')['value'].max().idxmax()
+        best_acc = dfs[dfs['params'] == best_params]['value'].max()
+        summary.append({
+            'Method': method,
+            'Best Parameters': best_params,
+            'Best Accuracy (%)': best_acc
+        })
+    
+    # Create summary table
+    summary_df = pd.DataFrame(summary)
+    summary_df.to_csv('optimizer_summary.csv', index=False)
+    
+    # Plot comparison
+    plt.figure(figsize=(10, 6))
+    sns.barplot(data=summary_df, x='Method', y='Best Accuracy (%)')
+    plt.xticks(rotation=45)
+    plt.title('Comparison of Optimization Methods')
+    plt.tight_layout()
+    plt.savefig('optimizer_comparison.png', dpi=300, bbox_inches='tight')
     plt.close()
 
-# Plot loss for multiple configurations
-def plot_loss_comparison(data_dict, title, output_file):
-    plt.figure(figsize=(12, 8))
-    for label, data in data_dict.items():
-        plt.plot(data['iteration'], data['loss'], marker='o', linestyle='-', markersize=3, label=label)
-    plt.title(title)
-    plt.xlabel('Iterations')
-    plt.ylabel('Loss')
-    plt.grid(True)
-    plt.legend()
-    plt.savefig(output_file)
-    plt.close()
-
-# Print summary statistics
-def print_summary(data_dict):
-    print("=== Performance Summary ===")
-    for label, data in data_dict.items():
-        final_accuracy = data['accuracy'].iloc[-1]
-        final_loss = data['loss'].iloc[-1]
-        final_iter = data['iteration'].iloc[-1]
-        
-        # Calculate mean improvement per 10k iterations
-        if len(data) > 1 and final_iter > 10000:
-            accuracy_points = data['accuracy'].values
-            iter_points = data['iteration'].values
-            
-            # Find points approximately every 10k iterations
-            indices = []
-            last_idx = 0
-            for i in range(1, len(iter_points)):
-                if iter_points[i] - iter_points[last_idx] >= 10000:
-                    indices.append(i)
-                    last_idx = i
-            
-            if indices:
-                improvements = [accuracy_points[indices[i]] - accuracy_points[indices[i-1]] 
-                               for i in range(1, len(indices))]
-                mean_improvement = np.mean(improvements) if improvements else 0
-            else:
-                mean_improvement = 0
-        else:
-            mean_improvement = 0
-            
-        print(f"{label}:")
-        print(f"  Final Accuracy: {final_accuracy:.6f}")
-        print(f"  Final Loss: {final_loss:.6f}")
-        print(f"  Mean Improvement per 10k iterations: {mean_improvement:.6f}")
-        print()
-
-# Main analysis function
-def analyze_results():
+def main():
+    """Run all analyses."""
     print("Analyzing results...")
     
-    # Part I - Basic SGD
-    print("\n=== Part I: Stochastic Gradient Descent ===")
-    sgd_basic = load_results('results_sgd_0.1_10.csv')
-    plot_accuracy_single(sgd_basic, 'SGD Accuracy (LR=0.1, Batch Size=10)', 'plots/part1_sgd_accuracy.png')
-    plot_loss_single(sgd_basic, 'SGD Loss (LR=0.1, Batch Size=10)', 'plots/part1_sgd_loss.png')
+    # Create plots directory if it doesn't exist
+    os.makedirs('plots', exist_ok=True)
     
-    # Part II-A - Effect of Batch Size
-    print("\n=== Part II-A: Effect of Batch Size ===")
-    sgd_bs1 = load_results('results_sgd_0.1_1.csv')
-    sgd_bs10 = sgd_basic.copy()  # Already loaded
-    sgd_bs100 = load_results('results_sgd_0.1_100.csv')
+    # Run analyses
+    analyze_sgd()
+    analyze_momentum()
+    analyze_lr_decay()
+    analyze_combined()
+    analyze_adam()
+    analyze_rmsprop()
     
-    batch_size_data = {
-        'Batch Size 1': sgd_bs1,
-        'Batch Size 10': sgd_bs10,
-        'Batch Size 100': sgd_bs100
-    }
+    # Generate summary
+    generate_summary_table()
     
-    plot_accuracy_comparison(batch_size_data, 'Effect of Batch Size on Accuracy (LR=0.1)', 
-                             'plots/part2a_batch_size_accuracy.png')
-    plot_loss_comparison(batch_size_data, 'Effect of Batch Size on Loss (LR=0.1)', 
-                         'plots/part2a_batch_size_loss.png')
-    print_summary(batch_size_data)
-    
-    # Part II-A - Effect of Learning Rate
-    print("\n=== Part II-A: Effect of Learning Rate ===")
-    sgd_lr001 = load_results('results_sgd_0.01_10.csv')
-    sgd_lr0001 = load_results('results_sgd_0.001_10.csv')
-    
-    learning_rate_data = {
-        'LR=0.1': sgd_bs10,
-        'LR=0.01': sgd_lr001,
-        'LR=0.001': sgd_lr0001
-    }
-    
-    plot_accuracy_comparison(learning_rate_data, 'Effect of Learning Rate on Accuracy (Batch Size=10)', 
-                             'plots/part2a_learning_rate_accuracy.png')
-    plot_loss_comparison(learning_rate_data, 'Effect of Learning Rate on Loss (Batch Size=10)', 
-                         'plots/part2a_learning_rate_loss.png')
-    print_summary(learning_rate_data)
-    
-    # Part II-B - Learning Rate Decay
-    print("\n=== Part II-B: Learning Rate Decay ===")
-    sgd_lr_decay = load_results('results_sgd_lr_decay_0.1_0.001.csv')
-    
-    lr_decay_data = {
-        'SGD (LR=0.1)': sgd_bs10,
-        'SGD with LR Decay (0.1→0.001)': sgd_lr_decay
-    }
-    
-    plot_accuracy_comparison(lr_decay_data, 'Effect of Learning Rate Decay on Accuracy', 
-                             'plots/part2b_lr_decay_accuracy.png')
-    plot_loss_comparison(lr_decay_data, 'Effect of Learning Rate Decay on Loss', 
-                         'plots/part2b_lr_decay_loss.png')
-    print_summary(lr_decay_data)
-    
-    # Part II-C - Momentum
-    print("\n=== Part II-C: Momentum ===")
-    sgd_momentum = load_results('results_sgd_momentum_0.9.csv')
-    
-    momentum_data = {
-        'SGD (LR=0.01)': sgd_lr001,
-        'SGD with Momentum (α=0.9)': sgd_momentum
-    }
-    
-    plot_accuracy_comparison(momentum_data, 'Effect of Momentum on Accuracy', 
-                             'plots/part2c_momentum_accuracy.png')
-    plot_loss_comparison(momentum_data, 'Effect of Momentum on Loss', 
-                         'plots/part2c_momentum_loss.png')
-    print_summary(momentum_data)
-    
-    # Part II-D - Combined Approaches
-    print("\n=== Part II-D: Combined Approaches ===")
-    sgd_combined = load_results('results_sgd_momentum_lr_decay.csv')
-    
-    combined_data = {
-        'SGD (LR=0.1)': sgd_bs10,
-        'SGD with LR Decay': sgd_lr_decay,
-        'SGD with Momentum': sgd_momentum,
-        'SGD with Momentum & LR Decay': sgd_combined
-    }
-    
-    plot_accuracy_comparison(combined_data, 'Effect of Combined Approaches on Accuracy', 
-                             'plots/part2d_combined_accuracy.png')
-    plot_loss_comparison(combined_data, 'Effect of Combined Approaches on Loss', 
-                         'plots/part2d_combined_loss.png')
-    print_summary(combined_data)
-    
-    # Part III - Adam
-    print("\n=== Part III: Adam Optimizer ===")
-    adam = load_results('results_adam.csv')
-    
-    adam_data = {
-        'SGD (LR=0.1)': sgd_bs10,
-        'SGD with Momentum & LR Decay': sgd_combined,
-        'Adam': adam
-    }
-    
-    plot_accuracy_comparison(adam_data, 'Adam vs Other Optimization Methods - Accuracy', 
-                             'plots/part3_adam_accuracy.png')
-    plot_loss_comparison(adam_data, 'Adam vs Other Optimization Methods - Loss', 
-                         'plots/part3_adam_loss.png')
-    print_summary(adam_data)
-    
-    print("Analysis complete. Plots saved to 'plots' directory.")
+    print("Analysis complete. Results saved in 'plots' directory.")
 
-if __name__ == "__main__":
-    analyze_results() 
+if __name__ == '__main__':
+    main() 

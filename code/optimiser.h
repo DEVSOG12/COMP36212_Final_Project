@@ -9,7 +9,8 @@ typedef enum {
     SGD_MOMENTUM,
     SGD_LR_DECAY,
     SGD_MOMENTUM_LR_DECAY,
-    ADAM
+    ADAM,
+    RMSPROP
 } optimisation_method_t;
 
 void initialise_optimiser(double learning_rate, int batch_size, int total_epochs);
